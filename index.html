@@ -1,1 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Link Shortener</title>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --card: #161b22;
+            --border: #30363d;
+            --text: #c9d1d9;
+            --accent: #58a6ff;
+            --success: #238636;
+        }
+        body { background: var(--bg); color: var(--text); font-family: sans-serif; padding: 2rem; max-width: 700px; margin: 0 auto; }
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        input { width: 100%; background: #0d1117; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 6px; margin-bottom: 10px; box-sizing: border-box; }
+        button { background: var(--success); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; }
+        button:hover { background: #2ea043; }
+        .log { font-family: monospace; font-size: 0.85rem; margin-top: 10px; color: #8b949e; }
+        .success { color: #3fb950; }
+        .error { color: #f85149; }
+        .final-link { background: #0d1117; padding: 10px; border-radius: 6px; border: 1px solid var(--border); word-break: break-all; margin-top: 10px; color: var(--accent); font-family: monospace; display: none;}
+    </style>
+</head>
+<body>
 
+    <h2>⚡ Auto Link Generator</h2>
+    <p class="log">Connects to GitHub API to automatically save links.</p>
+
+    <div class="card">
+        <h3>1. GitHub Setup (One Time)</h3>
+        <input type="password" id="ghToken" placeholder="Paste your GitHub Personal Access Token here">
+        <input type="text" id="ghUser" placeholder="GitHub Username (e.g., krisshdas)">
+        <input type="text" id="ghRepo" placeholder="Repository Name (e.g., Link-creator)">
+        <button onclick="saveConfig()">Save Configuration</button>
+    </div>
+
+    <div class="card">
+        <h3>2. Create Link</h3>
+        <input type="url" id="longUrl" placeholder="Paste Long URL (https://...)">
+        <button onclick="autoGenerate()">Generate & Push to GitHub</button>
+        
+        <div id="status" class="log"></div>
+        <div id="result" class="final-link"></div>
+    </div>
+
+<script>
+    // Load saved config
+    if(localStorage.getItem('gh_token')) document.getElementById('ghToken').value = localStorage.getItem('gh_token');
+    if(localStorage.getItem('gh_user')) document.getElementById('ghUser').value = localStorage.getItem('gh_user');
+    if(localStorage.getItem('gh_repo')) document.getElementById('ghRepo').value = localStorage.getItem('gh_repo');
+
+    function log(msg, type='') {
+        const el = document.getElementById('status');
+        el.innerHTML = `<span class="${type}">> ${msg}</span>`;
+    }
+
+    function saveConfig() {
+        localStorage.setItem('gh_token', document.getElementById('ghToken').value);
+        localStorage.setItem('gh_user', document.getElementById('ghUser').value);
+        localStorage.setItem('gh_repo', document.getElementById('ghRepo').value);
+        log("Configuration saved!", "success");
+    }
+
+    function generateId() {
+        return Math.random().toString(36).substring(2, 8); // Generates random ID like 'a1b2c3'
+    }
+
+    async function autoGenerate() {
+        const token = document.getElementById('ghToken').value;
+        const user = document.getElementById('ghUser').value;
+        const repo = document.getElementById('ghRepo').value;
+        const longUrl = document.getElementById('longUrl').value;
+        const newId = generateId();
+
+        if(!token || !user || !repo || !longUrl) {
+            log("Please fill all fields.", "error");
+            return;
+        }
+
+        log("Connecting to GitHub...", "");
+
+        try {
+            // 1. Fetch current links.json
+            const path = "links.json";
+            const url = `https://api.github.com/repos/${user}/${repo}/contents/${path}`;
+            
+            let currentSha = "";
+            let currentContent = {};
+
+            const response = await fetch(url, {
+                headers: { 'Authorization': `token ${token}` }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                currentSha = data.sha;
+                // Decode Base64 content
+                const decoded = atob(data.content);
+                currentContent = JSON.parse(decoded);
+            } else if (response.status === 404) {
+                log("links.json not found. Creating new one...", "");
+                // File doesn't exist yet, we will create it
+            } else {
+                throw new Error("GitHub API Error: " + response.status);
+            }
+
+            // 2. Add new link
+            if (currentContent[newId]) {
+                log("ID Collision! Trying again...", "error");
+                autoGenerate(); // Recursive retry
+                return;
+            }
+            currentContent[newId] = longUrl;
+
+            // 3. Upload back to GitHub
+            const contentEncoded = btoa(JSON.stringify(currentContent, null, 2));
+            
+            const putData = {
+                message: `Add link ${newId}`,
+                content: contentEncoded,
+                sha: currentSha // Required if updating existing file
+            };
+
+            const putResponse = await fetch(url, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `token ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(putData)
+            });
+
+            if (!putResponse.ok) throw new Error("Failed to save to GitHub");
+
+            // 4. Success
+            const shortUrl = `https://${user}.github.io/${repo}/redirect.html?id=${newId}`;
+            document.getElementById('result').style.display = 'block';
+            document.getElementById('result').innerText = shortUrl;
+            log("Success! Link created and saved automatically.", "success");
+
+        } catch (err) {
+            console.error(err);
+            log("Error: " + err.message, "error");
+        }
+    }
+</script>
+</body>
+</html>
