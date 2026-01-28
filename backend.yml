@@ -1,22 +1,20 @@
-name: Link Generator Backend
+name: Auto Link Generator
 
 on:
-  # Trigger when we push to the main branch (specifically the links.json file)
-  push:
-    branches:
-      - main
-    paths:
-      - 'links.json'
-
-  # Allows you to run this manually from the Actions tab
+  # Allows the frontend to trigger this
+  repository_dispatch:
+    types: [create-short-link]
+  
   workflow_dispatch:
 
-jobs:
-  build-link:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write # Required to write the new file to the repo
+permissions:
+  contents: write
+  pages: write
+  id-token: write
 
+jobs:
+  create_link:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -26,62 +24,50 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Install dependencies
-        run: pip install pyyaml
-
-      - name: Generate Redirect Files
+      - name: Generate Random ID & Update DB
         run: |
-          # This Python script reads links.json and creates HTML files
-          python3 << 'EOF'
-          import json
-          import os
-          import random
-          import string
+          # 1. Get the destination URL from the request
+          DEST_URL="${{ github.event.client_payload.url }}"
 
-          # Load the data
-          with open('links.json', 'r') as f:
-              data = json.load(f)
+          # 2. Generate a random 5-character ID (Letters & Numbers)
+          NEW_ID=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 5 | head -n 1)
 
-          # Create output directory if not exists
-          os.makedirs('out', exist_ok=True)
+          # 3. Read the existing database
+          if [ -f "db.json" ]; then
+            # Remove the last '}' so we can append
+            sed -i '$ s/}$//' db.json
+            # Add the new entry with a comma
+            echo ",\n  \"$NEW_ID\": \"$DEST_URL\"\n}" >> db.json
+          else
+            # Create new file if it doesn't exist
+            echo "{\n  \"$NEW_ID\": \"$DEST_URL\"\n}" > db.json
+          fi
 
-          for item in data:
-              target_url = item['url']
-              
-              # Generate a random 8-character string for unique file names
-              random_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
-              filename = f"{random_id}.html"
-              
-              # HTML Redirect Content
-              html_content = f"""<!DOCTYPE html>
-              <html lang="en">
-              <head>
-                  <meta charset="UTF-8">
-                  <meta http-equiv="refresh" content="0;url={target_url}">
-                  <script>window.location.replace("{target_url}");</script>
-                  <title>Redirecting...</title>
-              </head>
-              <body>
-              </body>
-              </html>"""
-              
-              # Write the file to the 'out' folder
-              with open(f'out/{filename}', 'w') as f:
-                  f.write(html_content)
-              
-              print(f"Created: {filename} -> {target_url}")
-          EOF
+          # 4. Save the new ID to an output file (to send back to frontend)
+          echo $NEW_ID > new_id.txt
 
-      - name: Commit and Push new Links
-        run: |
-          git config --global user.name "Link Bot"
-          git config --global user.email "bot@github.com"
-          
-          # Add the generated files from the 'out' folder
-          git add out/
-          
-          # Commit if there are changes
-          git diff --quiet && git diff --staged --quiet || git commit -m "Generate new short links"
-          
-          # Push back to the repository
+          # 5. Commit the changes
+          git config user.name "Link Bot"
+          git config user.email "bot@github.com"
+          git add db.json
+          git commit -m "Added short link: $NEW_ID"
           git push
+
+      - name: Wait for GitHub Pages update (Optional buffer)
+        run: sleep 10
+
+      - name: Upload to Pages
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: '.'
+
+  deploy:
+    needs: create_link
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
