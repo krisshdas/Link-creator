@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Redirecting...</title>
+    <style>
+        /* Purely visual styling, no ads */
+        body {
+            background-color: #000;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- This script handles the logic -->
+    <script>
+        (function() {
+            // 1. Get the ID from the URL (e.g., ?id=dn03wr)
+            const params = new URLSearchParams(window.location.search);
+            const id = params.get('id');
+
+            if (id) {
+                // 2. Fetch the database to find the destination
+                // We use .json extension here
+                fetch('db.json?' + Math.random()) // Adding random number prevents browser caching old data
+                    .then(response => response.json())
+                    .then(data => {
+                        const destination = data[id];
+                        
+                        if (destination) {
+                            // 3. Instant Redirect (No Ads, No Loops)
+                            window.location.replace(destination);
+                        } else {
+                            // ID not found
+                            document.body.innerHTML = "Link Not Found (404)";
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Error loading DB:", error);
+                        document.body.innerHTML = "Error loading link data.";
+                    });
+            } else {
+                // No ID provided
+                document.body.innerHTML = "No ID specified.";
+            }
+        })();
+    </script>
+
+    <!-- Fallback for users with JavaScript disabled -->
+    <noscript>
+        <meta http-equiv="refresh" content="0; url=https://github.com/krisshdas/Link-creator">
+        Please enable JavaScript or click <a href="https://github.com/krisshdas/Link-creator">here</a>.
+    </noscript>
+</body>
+</html>
