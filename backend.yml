@@ -1,0 +1,87 @@
+name: Link Generator Backend
+
+on:
+  # Trigger when we push to the main branch (specifically the links.json file)
+  push:
+    branches:
+      - main
+    paths:
+      - 'links.json'
+
+  # Allows you to run this manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build-link:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required to write the new file to the repo
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Generate Redirect Files
+        run: |
+          # This Python script reads links.json and creates HTML files
+          python3 << 'EOF'
+          import json
+          import os
+          import random
+          import string
+
+          # Load the data
+          with open('links.json', 'r') as f:
+              data = json.load(f)
+
+          # Create output directory if not exists
+          os.makedirs('out', exist_ok=True)
+
+          for item in data:
+              target_url = item['url']
+              
+              # Generate a random 8-character string for unique file names
+              random_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+              filename = f"{random_id}.html"
+              
+              # HTML Redirect Content
+              html_content = f"""<!DOCTYPE html>
+              <html lang="en">
+              <head>
+                  <meta charset="UTF-8">
+                  <meta http-equiv="refresh" content="0;url={target_url}">
+                  <script>window.location.replace("{target_url}");</script>
+                  <title>Redirecting...</title>
+              </head>
+              <body>
+              </body>
+              </html>"""
+              
+              # Write the file to the 'out' folder
+              with open(f'out/{filename}', 'w') as f:
+                  f.write(html_content)
+              
+              print(f"Created: {filename} -> {target_url}")
+          EOF
+
+      - name: Commit and Push new Links
+        run: |
+          git config --global user.name "Link Bot"
+          git config --global user.email "bot@github.com"
+          
+          # Add the generated files from the 'out' folder
+          git add out/
+          
+          # Commit if there are changes
+          git diff --quiet && git diff --staged --quiet || git commit -m "Generate new short links"
+          
+          # Push back to the repository
+          git push
