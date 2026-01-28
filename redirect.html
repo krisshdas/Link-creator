@@ -11,38 +11,39 @@
     </style>
 </head>
 <body>
-
     <div style="text-align:center;">
         <div class="loader" style="margin: 0 auto 20px auto;"></div>
-        <p>Redirecting you...</p>
+        <p>Redirecting...</p>
     </div>
 
     <script>
-        // --- DATABASE START ---
-        // PASTE YOUR GENERATED CODE SNIPPETS BELOW THIS LINE
-        // Example: links["abc123"] = "https://google.com";
-        
-        const links = {};
-
-        // --- DATABASE END ---
-
-        // Logic to handle the redirection
-        window.onload = function() {
+        window.onload = async function() {
             const params = new URLSearchParams(window.location.search);
             const id = params.get('id');
 
-            if (id && links[id]) {
-                // Link found, redirect
-                window.location.replace(links[id]);
-            } else if (id) {
-                // ID exists but not in database
-                document.body.innerHTML = "<h1>Link Not Found</h1><p>This ID has not been added to the database yet.</p>";
-            } else {
-                // No ID provided
-                document.body.innerHTML = "<h1>Invalid Link</h1><p>No ID specified.</p>";
+            if (!id) {
+                document.body.innerHTML = "<h1>Error: No ID provided</h1>";
+                return;
+            }
+
+            try {
+                // Fetch the links.json file from the same directory
+                const response = await fetch('links.json');
+                if (!response.ok) throw new Error("Database not found");
+                
+                const data = await response.json();
+
+                if (data[id]) {
+                    // Redirect to the long URL
+                    window.location.replace(data[id]);
+                } else {
+                    document.body.innerHTML = `<h1>404 Not Found</h1><p>Link ID '${id}' does not exist.</p>`;
+                }
+            } catch (error) {
+                document.body.innerHTML = `<h1>Error</h1><p>Could not load links database.</p>`;
+                console.error(error);
             }
         };
     </script>
-
 </body>
 </html>
