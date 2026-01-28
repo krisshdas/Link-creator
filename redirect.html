@@ -2,61 +2,47 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Redirecting...</title>
     <style>
-        /* Purely visual styling, no ads */
-        body {
-            background-color: #000;
-            color: #333;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            font-family: monospace;
-        }
+        body { background: #0d1117; color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .loader { border: 4px solid #30363d; border-top: 4px solid #58a6ff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
-    <!-- This script handles the logic -->
+    <div style="text-align:center;">
+        <div class="loader" style="margin: 0 auto 20px auto;"></div>
+        <p>Redirecting you...</p>
+    </div>
+
     <script>
-        (function() {
-            // 1. Get the ID from the URL (e.g., ?id=dn03wr)
+        // --- DATABASE START ---
+        // PASTE YOUR GENERATED CODE SNIPPETS BELOW THIS LINE
+        // Example: links["abc123"] = "https://google.com";
+        
+        const links = {};
+
+        // --- DATABASE END ---
+
+        // Logic to handle the redirection
+        window.onload = function() {
             const params = new URLSearchParams(window.location.search);
             const id = params.get('id');
 
-            if (id) {
-                // 2. Fetch the database to find the destination
-                // We use .json extension here
-                fetch('db.json?' + Math.random()) // Adding random number prevents browser caching old data
-                    .then(response => response.json())
-                    .then(data => {
-                        const destination = data[id];
-                        
-                        if (destination) {
-                            // 3. Instant Redirect (No Ads, No Loops)
-                            window.location.replace(destination);
-                        } else {
-                            // ID not found
-                            document.body.innerHTML = "Link Not Found (404)";
-                        }
-                    })
-                    .catch(error => {
-                        console.error("Error loading DB:", error);
-                        document.body.innerHTML = "Error loading link data.";
-                    });
+            if (id && links[id]) {
+                // Link found, redirect
+                window.location.replace(links[id]);
+            } else if (id) {
+                // ID exists but not in database
+                document.body.innerHTML = "<h1>Link Not Found</h1><p>This ID has not been added to the database yet.</p>";
             } else {
                 // No ID provided
-                document.body.innerHTML = "No ID specified.";
+                document.body.innerHTML = "<h1>Invalid Link</h1><p>No ID specified.</p>";
             }
-        })();
+        };
     </script>
 
-    <!-- Fallback for users with JavaScript disabled -->
-    <noscript>
-        <meta http-equiv="refresh" content="0; url=https://github.com/krisshdas/Link-creator">
-        Please enable JavaScript or click <a href="https://github.com/krisshdas/Link-creator">here</a>.
-    </noscript>
 </body>
 </html>
